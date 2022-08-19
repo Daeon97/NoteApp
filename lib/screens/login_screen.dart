@@ -93,20 +93,84 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               screenState == 0 ? stateRegister() : stateOTP(),
               GestureDetector(
-                onTap: () {
+                onTap: () async {
                   if (screenState == 0) {
                     if (_formKey.currentState!.validate()) {
-                      verifyPhone(countryDial + phoneController.text);
+                      // create an instance of our database
+                      var database = DataBase();
+
+                      // check if the user phone number exists
+                      var userQueryDocumentSnapshot = await database.userExists(
+                        mobileNumber: phoneController.text,
+                      );
+                      
+                      if (userQueryDocumentSnapshot != null) {
+                        // if the user phone number exists then check if the username matches
+                        final userNameMatches = await database.userNameMatches(
+                          queryDocumentSnapshot: userQueryDocumentSnapshot,
+                          userName: usernameController.text,
+                        );
+
+                        if (userNameMatches) {
+                          // if the username matches proceed to the rest of the auth flow
+                          verifyPhone(countryDial + phoneController.text);
+                        } else {
+                          // if the username does not match, throw an error to the user
+                          showSnackBarText(
+                            'Incorrect username. Please enter a correct username',
+                            Colors.red,
+                          );
+                        }
+                      } else {
+                        // if the user phone number does not exist check if the username has been taken
+                        var userNameTaken = await database.userNameTaken(
+                          mobileNumber: phoneController.text,
+                          userName: usernameController.text,
+                        );
+
+                        if (userNameTaken) {
+                          // if the user name is taken throw an error to the user
+                          showSnackBarText(
+                            'Username already taken. Please enter a different username',
+                            Colors.red,
+                          );
+                        } else {
+                          // if the user name is not taken proceed to the rest of the auth flow
+                          verifyPhone(countryDial + phoneController.text);
+                        }
+                      }
                     }
                   } else {
                     if (otpPin.length >= 6) {
-                      verifyOTP();
+                      // create an instance of our database
+                      var database = DataBase();
 
-                      DataBase()
-                          .addUser(
-                              mobileNumber: phoneController.text,
-                              userName: usernameController.text)
-                          .then((value) => log('added number'));
+                      // check if the user phone number exists
+                      // this is necessary so we do not add the user to the database twice
+
+                      // if you remove this check and just call database.addUser
+                      // the user will be duplicated in the database which is
+                      // something we do not want
+                      var userQueryDocumentSnapshot = await database.userExists(
+                        mobileNumber: phoneController.text,
+                      );
+                      
+                      if (userQueryDocumentSnapshot != null) {
+                        // if the user exist in the database already then verify the OTP
+                        verifyOTP();
+                      } else {
+                        // if the user does not exist in the database then add the user to the database
+                        database
+                            .addUser(
+                          mobileNumber: phoneController.text,
+                          userName: usernameController.text,
+                        )
+                            .then((value) {
+                          log('added number');
+                          // verify the OTP after adding the user to the database
+                          verifyOTP();
+                        });
+                      }
                     } else {
                       showSnackBarText('Enter OTP correctly!', Colors.red);
                     }

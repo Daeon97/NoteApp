@@ -19,13 +19,63 @@ class DataBase {
     fireStoreInstance
         .collection("users")
         .doc(FirebaseAuth.instance.currentUser?.uid)
-        .collection("user_info")
-        .add(
+        .set(
       {
         "mobile_number": mobileNumber,
         "user_name": userName,
       },
     );
+  }
+
+  // this function checks if the user already exists
+  Future<QueryDocumentSnapshot<Map<String, dynamic>>?> userExists({
+    required String mobileNumber,
+  }) async {
+    var querySnapshot = await fireStoreInstance
+        .collection("users")
+        .where("mobile_number", isEqualTo: mobileNumber)
+        .limit(1)
+        .get();
+
+    if (querySnapshot.docs.isNotEmpty) {
+      return querySnapshot.docs[0];
+    } else {
+      return null;
+    }
+  }
+
+// this function checks if the username matches
+// this will ensure that the user enters his
+// correct username
+  Future<bool> userNameMatches({
+    required QueryDocumentSnapshot<Map<String, dynamic>> queryDocumentSnapshot,
+    required String userName,
+  }) async {
+    if (queryDocumentSnapshot.data()["user_name"] == userName) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  // this function checks if the username is already taken
+  // this will ensure that each user has a unique username
+  Future<bool> userNameTaken({
+    required String mobileNumber,
+    required String userName,
+  }) async {
+    var querySnapshot = await fireStoreInstance
+        .collection("users")
+        .where("mobile_number", isNotEqualTo: mobileNumber)
+        .where("user_name", isEqualTo: userName)
+        .limit(1)
+        .get();
+
+    if (querySnapshot.docs.isNotEmpty) {
+      return true;
+    } else {
+      return false;
+    }
   }
 
   Future<void> deleteNote(
